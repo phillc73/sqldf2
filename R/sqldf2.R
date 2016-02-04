@@ -5,6 +5,7 @@ library(microbenchmark)
 #library(data.table)
 library(sqldf)
 library(Rcpp)
+library(compiler)
 
 # Load some data
 data(mtcars)
@@ -22,6 +23,7 @@ cppFunction('List select_out(List x, CharacterVector y) {
 # Benchmark the test function
 microbenchmark(times=50,
                sqldf2Out <- sqldf2("SELECT mpg, cyl FROM mtcars"),
+               sqldf2compiledOut <- sqldf2compiled("SELECT mpg, cyl FROM mtcars"),
                sqldfOut <- sqldf("SELECT mpg, cyl FROM mtcars"),
                dplyrout <- dplyr::select(mtcars, mpg, cyl),
                baseout <- mtcars[c("mpg", "cyl")],
@@ -54,5 +56,6 @@ sqldf2 <- function(query){
 
 }
 
-
+# Try compiling for speed
+sqldf2compiled <- cmpfun(sqldf2)
 
