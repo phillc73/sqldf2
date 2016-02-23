@@ -6,6 +6,7 @@ library(microbenchmark)
 library(sqldf)
 library(Rcpp)
 library(compiler)
+library(stringi)
 
 # Load some data
 data(mtcars)
@@ -24,6 +25,7 @@ cppFunction('List select_out(List x, CharacterVector y) {
 microbenchmark(times=50,
                sqldf2Out <- sqldf2("SELECT mpg, cyl FROM mtcars"),
                sqldf2compiledOut <- sqldf2compiled("SELECT mpg, cyl FROM mtcars"),
+               sqldf2StringiOut <- sqldf2stringi("SELECT mpg, cyl FROM mtcars"),
                sqldfOut <- sqldf("SELECT mpg, cyl FROM mtcars"),
                dplyrout <- dplyr::select(mtcars, mpg, cyl),
                baseout <- mtcars[c("mpg", "cyl")],
@@ -35,10 +37,10 @@ microbenchmark(times=50,
 # The function
 sqldf2 <- function(query){
   querySplit <- scan(text =   # use scan to separate after insertion of commas
-                       gsub("SELECT", "SELECT:",   # put commas in after "SELECT"
+                       gsub("SELECT", "SELECT:",   # put colon in after "SELECT"
                             gsub("FROM", ":FROM",
-                                 gsub("FROM", "FROM:",    query))) ,  # add commas before "FROM"
-                     what="", sep=":")  # tell scan this character argument and separators are ","
+                                 gsub("FROM", "FROM:",    query))) ,  # add colon before "FROM"
+                     what="", sep=":")  # tell scan this character argument and separators are ":"
 
   querySplit <- trimws(querySplit)
 
@@ -58,4 +60,20 @@ sqldf2 <- function(query){
 
 # Try compiling for speed
 sqldf2compiled <- cmpfun(sqldf2)
+
+# With stringi instead of scan and gsub
+sqldf2stringi <- function(query){
+  querySub <- stri_replace_all_fixed(query,
+                                     c("SELECT", "FROM"), c("SELECT:", ":FROM:"), vectorize_all=FALSE)
+  querySplit <- stri_split_fixed(querySub, ":", omit_empty=TRUE)
+  querySplit <- trimws(unlist(querySplit))
+
+  cols <- stri_split_fixed(querySplit[2], ",")[[1]]
+  cols <- trimws(cols)
+
+  queryDf <- eval(parse(text = querySplit[4]))
+
+  as.data.frame(queryDf[c(cols)])
+
+}
 
