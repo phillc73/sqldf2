@@ -1,5 +1,7 @@
 # This is all testing and not likely to work!
 # Load some libraries
+library(MonetDBLite)
+library(DBI)
 library(dplyr)
 library(microbenchmark)
 #library(data.table)
@@ -20,16 +22,21 @@ cppFunction('List select_out(List x, CharacterVector y) {
   return x[y];
 }')
 
+# MonetDBList table initialisation
+con <- dbConnect(MonetDBLite::MonetDBLite())
+dbWriteTable(con, "mtcars", mtcars)
 
 # Benchmark the test function
-microbenchmark(times=50,
+microbenchmark(times=500,
                sqldf2Out <- sqldf2("SELECT mpg, cyl FROM mtcars"),
                sqldf2compiledOut <- sqldf2compiled("SELECT mpg, cyl FROM mtcars"),
                sqldf2StringiOut <- sqldf2stringi("SELECT mpg, cyl FROM mtcars"),
+               sqldf2StringicompiledOut <- sqldf2stringicompiled("SELECT mpg, cyl FROM mtcars"),
                sqldfOut <- sqldf("SELECT mpg, cyl FROM mtcars"),
                dplyrout <- dplyr::select(mtcars, mpg, cyl),
                baseout <- mtcars[c("mpg", "cyl")],
-               rcppout <- select_out(mtcars, c("mpg", "cyl"))
+               rcppout <- select_out(mtcars, c("mpg", "cyl")),
+               monetdbliteOut <- dbGetQuery(con, "SELECT mpg, cyl FROM mtcars")
                )
 
 ################################################################################################
@@ -50,9 +57,9 @@ sqldf2 <- function(query){
   queryDf <- eval(parse(text = querySplit[4]))
 
   # Run Rcpp function
-  # select_out(queryDf, c(cols))
+   select_out(queryDf, c(cols))
   # Base R out
-  as.data.frame(queryDf[c(cols)])
+  # as.data.frame(queryDf[c(cols)])
   # dplyr out
   #as.data.frame(dplyr::select(queryDf, cols))
 
@@ -73,7 +80,12 @@ sqldf2stringi <- function(query){
 
   queryDf <- eval(parse(text = querySplit[4]))
 
-  as.data.frame(queryDf[c(cols)])
+  # Run Rcpp function
+   select_out(queryDf, c(cols))
+
+  # as.data.frame(queryDf[c(cols)])
 
 }
 
+# Try compiling for speed
+sqldf2stringicompiled <- cmpfun(sqldf2stringi)
